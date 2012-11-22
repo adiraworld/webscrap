@@ -27,17 +27,15 @@ exports.getWebData = function(url){
 
 var jsdom = require('jsdom');
 var request = require('request');
+var http = require('http');
 var zlib = require('zlib');
 var fs = require('fs');
 
 exports.getWebData = function(url){
-  var webData = new Array();
-
-  
-  request({url: url
-  	, 'headers': {
-		'Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-		'Accept-Charset':'windows-949,utf-8;q=0.7,*;q=0.3',
+	var webData = new Array();
+/*
+	request({url: url
+	  	, 'headers': {				
 		'Accept-Encoding':'gzip,deflate,sdch',
 		'Accept-Language':'ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4',
 		'Cache-Control':'max-age=0',
@@ -47,34 +45,60 @@ exports.getWebData = function(url){
 		'User-Agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_5) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11'
 		}
 	}, function(err,response,body){
+*/
+	var request = http.get({ host: 'www.naver.com',
+                         path: '/',
+                         port: 80,
+                         headers: { 'accept-encoding': 'gzip,deflate' } });	
+                         
+                         
+	request.on('response', function(response) {
+
 		var self = this;
 		self.items = new Array();
 		
-		if(err & response.statusCode !== 200){
+		if(response.statusCode !== 200){
 			console.log('Request error.');			
 		}
 		
 		console.log(response.headers);
 		
-		var output = fs.createWriteStream('me_index.html');
-		var buffer = [];
+		var body = "";
+		var output;
+		
 		
 		switch (response.headers['content-encoding']) {
-			case 'gzip':	
+			case 'gzip':
+				var gzip = zlib.createGunzip();
+				response.pipe(gzip);	
+				output = gzip;
+				console.log("gzip");				
+				break;
 			case 'deflate':
-				zlib.unzip(response.body, function(err, buffer) {
-					if (!err) {
-						self.parser.write(buffer.toString());
-						console.log(buffer.toString());
-					} else {
-						console.log(err);
-					}
-			    });
+				var inflate = zlib.createInflate();
+				response.pipe(inflate);
+				output = inflate;	
+				console.log("deflate");		
 				break;
 			default:
-		      
-		      break;
+		    	output = response;
+		    	console.log("default");	
+		    	break;
 		}
+		
+		output.on('data', function (data) {
+			data = data.toString('utf-8');
+			body += data;
+	    });
+	
+	    output.on('end', function() {
+	    	console.log("end");
+	        //return next(false, body);
+	        fs.writeFile("me_index.html",body,"utf8",function(err){
+	        	console.log("WRITE FILE ASYNC COMPLETE");
+	        });
+	    });
+
 		
 		/*
 		switch (response.headers['content-encoding']) {
